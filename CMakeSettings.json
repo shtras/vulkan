@@ -9,7 +9,8 @@
       "installRoot": "${projectDir}\\out\\install\\${name}",
       "buildCommandArgs": "",
       "ctestCommandArgs": "",
-      "cmakeToolchain": "D:/projects/vcpkg/scripts/buildsystems/vcpkg.cmake"
+      "cmakeToolchain": "D:/projects/vcpkg/scripts/buildsystems/vcpkg.cmake",
+      "cmakeCommandArgs": "-DENABLE_EXTRA_CHECKS=1 -DCMAKE_VERBOSE_MAKEFILE:BOOL=ON"
     },
     {
       "name": "x64-Release",
