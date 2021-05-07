@@ -1,9 +1,12 @@
+#pragma warning(disable : 26812)
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
 #include <iostream>
 #include <stdexcept>
 #include <cstdlib>
+#include <cassert>
+#include <vector>
 
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
@@ -37,11 +40,45 @@ private:
     void createInstance()
     {
         VkApplicationInfo appInfo{.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO,
+            .pNext = nullptr,
             .pApplicationName = "Hello Triangle",
             .applicationVersion = VK_MAKE_VERSION(1, 0, 0),
             .pEngineName = "No Engine",
             .engineVersion = VK_MAKE_VERSION(1, 0, 0),
             .apiVersion = VK_API_VERSION_1_0};
+
+        uint32_t extensionCount = 0;
+        vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
+        std::vector<VkExtensionProperties> extensions(extensionCount);
+        vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
+        for (const auto& ext : extensions) {
+            spdlog::debug("Existing extension: {}", ext.extensionName);
+        }
+
+        uint32_t glfwExtensionCount = 0;
+        const char** glfwExtensions = nullptr;
+        glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
+        for (uint32_t i = 0; i < glfwExtensionCount; ++i) {
+            spdlog::debug("Required extension: {}", glfwExtensions[i]);
+            std::string extName{glfwExtensions[i]};
+            if (!std::any_of(extensions.begin(), extensions.end(),
+                    [&](const auto& ext) { return std::string(ext.extensionName) == extName; })) {
+                spdlog::error("Missing required extention: {}", extName);
+                throw std::runtime_error("Missing extention");
+            }
+        }
+
+        VkInstanceCreateInfo createInfo{.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO,
+            .pNext = nullptr,
+            .pApplicationInfo = &appInfo,
+            .enabledLayerCount = 0,
+            .enabledExtensionCount = glfwExtensionCount,
+            .ppEnabledExtensionNames = glfwExtensions};
+
+        auto result = vkCreateInstance(&createInfo, nullptr, &instance);
+        if (result != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create instance!");
+        }
     }
 
     void mainLoop()
@@ -53,6 +90,7 @@ private:
 
     void cleanup()
     {
+        vkDestroyInstance(instance, nullptr);
         glfwDestroyWindow(window);
         glfwTerminate();
     }
@@ -75,7 +113,7 @@ int main()
     try {
         app.run();
     } catch (const std::exception& e) {
-        std::cerr << e.what() << std::endl;
+        spdlog::error("{}", e.what());
         return EXIT_FAILURE;
     }
 
