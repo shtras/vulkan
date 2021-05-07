@@ -69,6 +69,35 @@ private:
         createInstance();
         setupDebugMessenger();
         pickPhysicalDevice();
+        createLogicalDevice();
+    }
+
+    void createLogicalDevice()
+    {
+        QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+
+        float queuePriority = 1.0f;
+        VkDeviceQueueCreateInfo queueCreateInfo{.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+            .queueFamilyIndex = indices.graphicsFamily.value(),
+            .queueCount = 1,
+            .pQueuePriorities = &queuePriority};
+
+        VkPhysicalDeviceFeatures deviceFeatures{};
+
+        VkDeviceCreateInfo createInfo{.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+            .queueCreateInfoCount = 1,
+            .pQueueCreateInfos = &queueCreateInfo,
+            .pEnabledFeatures = &deviceFeatures};
+        if (enableValidationLayers) {
+            // Deprecated. Backwards compatibility
+            createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
+            createInfo.ppEnabledLayerNames = validationLayers.data();
+        }
+
+        auto res = vkCreateDevice(physicalDevice, &createInfo, nullptr, &device);
+        if (res != VK_SUCCESS) {
+            throw std::runtime_error("Failed creating a logical device");
+        }
     }
 
     bool isDeviceSuitable(VkPhysicalDevice device)
@@ -265,6 +294,8 @@ private:
 
     void cleanup()
     {
+        vkDestroyDevice(device, nullptr);
+
         cleanupDebugMessenger();
 
         vkDestroyInstance(instance, nullptr);
@@ -309,6 +340,7 @@ private:
     VkInstance instance = nullptr;
     VkDebugUtilsMessengerEXT debugMessenger = nullptr;
     VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
+    VkDevice device = nullptr;
 };
 
 int main()
