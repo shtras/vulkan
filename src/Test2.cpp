@@ -71,6 +71,32 @@ private:
         pickPhysicalDevice();
         createLogicalDevice();
         createSwapChain();
+        createImageViews();
+    }
+
+    void createImageViews()
+    {
+        for (const auto& image : swapChainImages) {
+            VkImageViewCreateInfo createInfo{.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+                .image = image,
+                .viewType = VK_IMAGE_VIEW_TYPE_2D,
+                .format = swapChainImageFormat,
+                .components = VkComponentMapping{.r = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .g = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .b = VK_COMPONENT_SWIZZLE_IDENTITY,
+                    .a = VK_COMPONENT_SWIZZLE_IDENTITY},
+                .subresourceRange = VkImageSubresourceRange{.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .baseMipLevel = 0,
+                    .levelCount = 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1}};
+            VkImageView view = nullptr;
+            auto res = vkCreateImageView(device, &createInfo, nullptr, &view);
+            if (res != VK_SUCCESS) {
+                throw std::runtime_error("Failed creating image view");
+            }
+            swapChainImageViews.push_back(view);
+        }
     }
 
     void createSwapChain()
@@ -502,6 +528,8 @@ private:
 
     void cleanup()
     {
+        std::for_each(swapChainImageViews.begin(), swapChainImageViews.end(),
+            [&](auto& imageView) { vkDestroyImageView(device, imageView, nullptr); });
         vkDestroySwapchainKHR(device, swapChain, nullptr);
         vkDestroyDevice(device, nullptr);
 
@@ -557,6 +585,7 @@ private:
     VkSurfaceKHR surface = nullptr;
     VkSwapchainKHR swapChain = nullptr;
     std::vector<VkImage> swapChainImages;
+    std::vector<VkImageView> swapChainImageViews;
     VkFormat swapChainImageFormat = VK_FORMAT_UNDEFINED;
     VkExtent2D swapChainExtent{};
 };
