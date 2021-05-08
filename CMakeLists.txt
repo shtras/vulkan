@@ -2,7 +2,7 @@
 cmake_policy(SET CMP0074 NEW)
 cmake_policy(SET CMP0048 NEW)
 
-project(Test1 VERSION 1.0.0)
+project(Tutorials VERSION 1.0.0)
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Debug)
 endif ()
@@ -63,6 +63,25 @@ find_package(spdlog CONFIG REQUIRED)
 find_package(glm CONFIG REQUIRED)
 find_package(glfw3 CONFIG REQUIRED)
 find_package(Vulkan REQUIRED)
+
+find_package(Vulkan COMPONENTS glslc)
+find_program(glslc_executable NAMES glslc HINTS Vulkan::glslc)
+
+function(compile_shader target)
+    cmake_parse_arguments(PARSE_ARGV 1 arg "" "FORMAT" "SOURCES")
+    foreach(source ${arg_SOURCES})
+        add_custom_command(
+            OUTPUT ${CMAKE_SOURCE_DIR}/run/shaders/${source}.spv
+            DEPENDS ${CMAKE_SOURCE_DIR}/shaders/${source}
+            COMMAND
+                ${glslc_executable}
+                -MD -MF ${CMAKE_SOURCE_DIR}/run/shaders/${source}.d
+                -o ${CMAKE_SOURCE_DIR}/run/shaders/${source}.spv
+                ${CMAKE_SOURCE_DIR}/shaders/${source}
+        )
+        target_sources(${target} PRIVATE ${CMAKE_SOURCE_DIR}/run/shaders/${source}.spv)
+    endforeach()
+endfunction()
 
 if (BUILD_TOOLS)
     message("Building additonal tools")

@@ -1,3 +1,5 @@
+#include "Utils/Utils.h"
+
 #pragma warning(push)
 #pragma warning(disable : 26812)
 
@@ -18,6 +20,8 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 
+namespace VaryZulu::Test2
+{
 struct QueueFamilyIndices
 {
     std::optional<uint32_t> graphicsFamily;
@@ -72,6 +76,13 @@ private:
         createLogicalDevice();
         createSwapChain();
         createImageViews();
+        createGraphicsPipeline();
+    }
+
+    void createGraphicsPipeline()
+    {
+        auto vertShaderCode = Utils::readFile("shaders/shader.vert.spv");
+        auto fragShaderCode = Utils::readFile("shaders/shader.frag.spv");
     }
 
     void createImageViews()
@@ -590,13 +601,15 @@ private:
     VkExtent2D swapChainExtent{};
 };
 
+} // namespace VaryZulu::Test2
+
 int main()
 {
     spdlog::set_default_logger(
         spdlog::stdout_color_mt(std::string("logger"), spdlog::color_mode::always));
     spdlog::set_level(spdlog::level::debug);
     spdlog::info("Hello!");
-    HelloTriangleApplication app;
+    VaryZulu::Test2::HelloTriangleApplication app;
 
     try {
         app.run();
