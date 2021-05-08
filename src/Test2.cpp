@@ -91,6 +91,7 @@ private:
         imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
         renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
         inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+        inFlightImages.resize(swapChainImages.size(), VK_NULL_HANDLE);
         VkSemaphoreCreateInfo createInfo{.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
 
         auto makeSem = [&](VkSemaphore& s) {
@@ -811,7 +812,6 @@ private:
     bool drawFrame()
     {
         vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
-        vkResetFences(device, 1, &inFlightFences[currentFrame]);
         uint32_t imageIdx = 0;
         auto res = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX,
             imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIdx);
@@ -819,7 +819,12 @@ private:
             spdlog::error("Failed to acquire the next image");
             return false;
         }
+        if (inFlightImages[imageIdx] != VK_NULL_HANDLE) {
+            vkWaitForFences(device, 1, &inFlightImages[imageIdx], VK_TRUE, UINT64_MAX);
+        }
+        inFlightImages[imageIdx] = inFlightFences[currentFrame];
 
+        vkResetFences(device, 1, &inFlightFences[currentFrame]);
         VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
         VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
         VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
@@ -937,6 +942,7 @@ private:
     std::vector<VkSemaphore> imageAvailableSemaphores;
     std::vector<VkSemaphore> renderFinishedSemaphores;
     std::vector<VkFence> inFlightFences;
+    std::vector<VkFence> inFlightImages;
     size_t currentFrame = 0;
 };
 
