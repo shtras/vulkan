@@ -22,6 +22,8 @@
 
 namespace VaryZulu::Test2
 {
+constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+
 struct QueueFamilyIndices
 {
     std::optional<uint32_t> graphicsFamily;
@@ -81,20 +83,41 @@ private:
         createFrameBuffers();
         createCommandPool();
         createCommandBuffers();
-        createSemaphores();
+        createSyncObjects();
     }
 
-    void createSemaphores()
+    void createSyncObjects()
     {
+        imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+        renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+        inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
         VkSemaphoreCreateInfo createInfo{.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
-        auto res = vkCreateSemaphore(device, &createInfo, nullptr, &imageAvailableSemaphore);
-        if (res != VK_SUCCESS) {
-            throw std::runtime_error("Failed creating image available semaphore");
-        }
-        res = vkCreateSemaphore(device, &createInfo, nullptr, &renderFinishedSemaphore);
-        if (res != VK_SUCCESS) {
-            throw std::runtime_error("Failed creating render finished semaphore");
-        }
+
+        auto makeSem = [&](VkSemaphore& s) {
+            VkSemaphore newSem = nullptr;
+            auto res = vkCreateSemaphore(device, &createInfo, nullptr, &newSem);
+            if (res != VK_SUCCESS) {
+                throw std::runtime_error("Failed to create semaphore");
+            }
+            s = newSem;
+        };
+
+        std::for_each(imageAvailableSemaphores.begin(), imageAvailableSemaphores.end(),
+            [&](auto& s) { makeSem(s); });
+
+        std::for_each(renderFinishedSemaphores.begin(), renderFinishedSemaphores.end(),
+            [&](auto& s) { makeSem(s); });
+
+        VkFenceCreateInfo fenceInfo{
+            .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO, .flags = VK_FENCE_CREATE_SIGNALED_BIT};
+        std::for_each(inFlightFences.begin(), inFlightFences.end(), [&](auto& f) {
+            VkFence newFence = nullptr;
+            auto res = vkCreateFence(device, &fenceInfo, nullptr, &newFence);
+            if (res != VK_SUCCESS) {
+                throw std::runtime_error("Failed to create fence");
+            }
+            f = newFence;
+        });
     }
 
     void createCommandBuffers()
@@ -787,17 +810,19 @@ private:
 
     bool drawFrame()
     {
+        vkWaitForFences(device, 1, &inFlightFences[currentFrame], VK_TRUE, UINT64_MAX);
+        vkResetFences(device, 1, &inFlightFences[currentFrame]);
         uint32_t imageIdx = 0;
-        auto res = vkAcquireNextImageKHR(
-            device, swapChain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIdx);
+        auto res = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX,
+            imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIdx);
         if (res != VK_SUCCESS) {
             spdlog::error("Failed to acquire the next image");
             return false;
         }
 
-        VkSemaphore waitSemaphores[] = {imageAvailableSemaphore};
+        VkSemaphore waitSemaphores[] = {imageAvailableSemaphores[currentFrame]};
         VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
-        VkSemaphore signalSemaphores[] = {renderFinishedSemaphore};
+        VkSemaphore signalSemaphores[] = {renderFinishedSemaphores[currentFrame]};
         VkSubmitInfo submitInfo{.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
             .waitSemaphoreCount = 1,
             .pWaitSemaphores = waitSemaphores,
@@ -806,7 +831,7 @@ private:
             .pCommandBuffers = &commandBuffers[imageIdx],
             .signalSemaphoreCount = 1,
             .pSignalSemaphores = signalSemaphores};
-        res = vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+        res = vkQueueSubmit(graphicsQueue, 1, &submitInfo, inFlightFences[currentFrame]);
         if (res != VK_SUCCESS) {
             spdlog::error("Submitting to queue failed");
             return false;
@@ -825,13 +850,18 @@ private:
             spdlog::error("Presenting queue failed");
             return false;
         }
+        currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
         return true;
     }
 
     void cleanup()
     {
-        vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
-        vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
+        std::for_each(renderFinishedSemaphores.begin(), renderFinishedSemaphores.end(),
+            [this](auto& s) { vkDestroySemaphore(device, s, nullptr); });
+        std::for_each(imageAvailableSemaphores.begin(), imageAvailableSemaphores.end(),
+            [this](auto& s) { vkDestroySemaphore(device, s, nullptr); });
+        std::for_each(inFlightFences.begin(), inFlightFences.end(),
+            [this](auto& s) { vkDestroyFence(device, s, nullptr); });
         vkDestroyCommandPool(device, commandPool, nullptr);
         std::for_each(swapChainFramebuffers.begin(), swapChainFramebuffers.end(),
             [this](auto& buf) { vkDestroyFramebuffer(device, buf, nullptr); });
@@ -904,8 +934,10 @@ private:
     VkPipelineLayout pipelineLayout = nullptr;
     VkPipeline graphicsPipeline = nullptr;
     VkCommandPool commandPool = nullptr;
-    VkSemaphore imageAvailableSemaphore = nullptr;
-    VkSemaphore renderFinishedSemaphore = nullptr;
+    std::vector<VkSemaphore> imageAvailableSemaphores;
+    std::vector<VkSemaphore> renderFinishedSemaphores;
+    std::vector<VkFence> inFlightFences;
+    size_t currentFrame = 0;
 };
 
 } // namespace VaryZulu::Test2
