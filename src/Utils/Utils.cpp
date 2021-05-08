@@ -1,6 +1,7 @@
 #include "Utils.h"
 
 #include <fstream>
+#include <chrono>
 
 namespace VaryZulu::Utils
 {
@@ -19,4 +20,12 @@ std::vector<char> readFile(const std::string& fileName)
     file.close();
     return buffer;
 }
+
+int64_t GetCurrentTimeMs()
+{
+    auto now = std::chrono::system_clock::now();
+    auto msNow = std::chrono::time_point_cast<std::chrono::milliseconds>(now);
+    return msNow.time_since_epoch().count();
+}
+
 } // namespace VaryZulu::Utils

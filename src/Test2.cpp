@@ -800,10 +800,19 @@ private:
 
     void mainLoop()
     {
+        int64_t lastTimeMs = Utils::GetCurrentTimeMs();
+        int64_t frames = 0;
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
             if (!drawFrame()) {
                 break;
+            }
+            ++frames;
+            auto timeMs = Utils::GetCurrentTimeMs();
+            if (timeMs - lastTimeMs > 1000) {
+                spdlog::debug("{} FPS", frames);
+                frames = 0;
+                lastTimeMs = timeMs;
             }
         }
         vkDeviceWaitIdle(device);
