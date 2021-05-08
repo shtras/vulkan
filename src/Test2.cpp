@@ -81,6 +81,20 @@ private:
         createFrameBuffers();
         createCommandPool();
         createCommandBuffers();
+        createSemaphores();
+    }
+
+    void createSemaphores()
+    {
+        VkSemaphoreCreateInfo createInfo{.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
+        auto res = vkCreateSemaphore(device, &createInfo, nullptr, &imageAvailableSemaphore);
+        if (res != VK_SUCCESS) {
+            throw std::runtime_error("Failed creating image available semaphore");
+        }
+        res = vkCreateSemaphore(device, &createInfo, nullptr, &renderFinishedSemaphore);
+        if (res != VK_SUCCESS) {
+            throw std::runtime_error("Failed creating render finished semaphore");
+        }
     }
 
     void createCommandBuffers()
@@ -120,8 +134,8 @@ private:
             res = vkEndCommandBuffer(buf);
             if (res != VK_SUCCESS) {
                 throw std::runtime_error("Failed recording command buffer");
-                ++i;
             }
+            ++i;
         }
     }
 
@@ -177,11 +191,20 @@ private:
             .colorAttachmentCount = 1,
             .pColorAttachments = &colorAttachmentRef};
 
+        VkSubpassDependency dependency{.srcSubpass = VK_SUBPASS_EXTERNAL,
+            .dstSubpass = 0,
+            .srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+            .srcAccessMask = 0,
+            .dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT};
+
         VkRenderPassCreateInfo renderPassInfo{.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
             .attachmentCount = 1,
             .pAttachments = &colorAttachment,
             .subpassCount = 1,
-            .pSubpasses = &subpass};
+            .pSubpasses = &subpass,
+            .dependencyCount = 1,
+            .pDependencies = &dependency};
         auto res = vkCreateRenderPass(device, &renderPassInfo, nullptr, &renderPass);
         if (res != VK_SUCCESS) {
             throw std::runtime_error("Failed creating a render pass");
@@ -755,11 +778,60 @@ private:
     {
         while (!glfwWindowShouldClose(window)) {
             glfwPollEvents();
+            if (!drawFrame()) {
+                break;
+            }
         }
+        vkDeviceWaitIdle(device);
+    }
+
+    bool drawFrame()
+    {
+        uint32_t imageIdx = 0;
+        auto res = vkAcquireNextImageKHR(
+            device, swapChain, UINT64_MAX, imageAvailableSemaphore, VK_NULL_HANDLE, &imageIdx);
+        if (res != VK_SUCCESS) {
+            spdlog::error("Failed to acquire the next image");
+            return false;
+        }
+
+        VkSemaphore waitSemaphores[] = {imageAvailableSemaphore};
+        VkPipelineStageFlags waitStages[] = {VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT};
+        VkSemaphore signalSemaphores[] = {renderFinishedSemaphore};
+        VkSubmitInfo submitInfo{.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = waitSemaphores,
+            .pWaitDstStageMask = waitStages,
+            .commandBufferCount = 1,
+            .pCommandBuffers = &commandBuffers[imageIdx],
+            .signalSemaphoreCount = 1,
+            .pSignalSemaphores = signalSemaphores};
+        res = vkQueueSubmit(graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
+        if (res != VK_SUCCESS) {
+            spdlog::error("Submitting to queue failed");
+            return false;
+        }
+
+        VkSwapchainKHR swapChains[] = {swapChain};
+        VkPresentInfoKHR presentInfo{.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR,
+            .waitSemaphoreCount = 1,
+            .pWaitSemaphores = signalSemaphores,
+            .swapchainCount = 1,
+            .pSwapchains = swapChains,
+            .pImageIndices = &imageIdx};
+
+        res = vkQueuePresentKHR(presentQueue, &presentInfo);
+        if (res != VK_SUCCESS) {
+            spdlog::error("Presenting queue failed");
+            return false;
+        }
+        return true;
     }
 
     void cleanup()
     {
+        vkDestroySemaphore(device, renderFinishedSemaphore, nullptr);
+        vkDestroySemaphore(device, imageAvailableSemaphore, nullptr);
         vkDestroyCommandPool(device, commandPool, nullptr);
         std::for_each(swapChainFramebuffers.begin(), swapChainFramebuffers.end(),
             [this](auto& buf) { vkDestroyFramebuffer(device, buf, nullptr); });
@@ -832,6 +904,8 @@ private:
     VkPipelineLayout pipelineLayout = nullptr;
     VkPipeline graphicsPipeline = nullptr;
     VkCommandPool commandPool = nullptr;
+    VkSemaphore imageAvailableSemaphore = nullptr;
+    VkSemaphore renderFinishedSemaphore = nullptr;
 };
 
 } // namespace VaryZulu::Test2
