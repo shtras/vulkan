@@ -1,6 +1,7 @@
-﻿cmake_minimum_required(VERSION 3.12)
-cmake_policy(SET CMP0074 NEW)
-cmake_policy(SET CMP0048 NEW)
+﻿cmake_minimum_required(VERSION 3.15)
+cmake_policy(SET CMP0092 NEW)
+
+message("${CMAKE_CXX_FLAGS}")
 
 project(Tutorials VERSION 1.0.0)
 if (NOT CMAKE_BUILD_TYPE)
@@ -14,23 +15,24 @@ function(ENABLE_EXTRA_CHECKS)
     message("Enabling extra warnings")
     # set(CMAKE_CXX_CLANG_TIDY clang-tidy-10 -extra-arg=-Wno-unknown-warning-option -extra-arg=-Wno-format-nonliteral -extra-arg=-Wno-cast-align PARENT_SCOPE)
     if (WIN32)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP /permissive- /W4 /w14640 /w14242 /w14254 /w14263 /w14265 /w14287" PARENT_SCOPE)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /we4289 /w14296 /w14311 /w14545 /w14546 /w14547 /w14549 /w14555 /w14619 /w14826 /w14905 /w14906 /w14928" PARENT_SCOPE)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /MP /permissive- /W4 /w14640 /w14242 /w14254 \
+        /w14263 /w14265 /w14287 /we4289 /w14296 /w14311 /w14545 /w14546 /w14547 /w14549 /w14555 \
+        /w14619 /w14826 /w14905 /w14906 /w14928" PARENT_SCOPE)
 
     else ()
         set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pedantic -pedantic-errors -std=c++17 -Wall -Wextra -Wshadow \
             -Wnon-virtual-dtor -Wold-style-cast -Wcast-align -Wunused -Woverloaded-virtual -Wpedantic \
-            -Wconversion -Wsign-conversion -Wnull-dereference -Wdouble-promotion -Wformat=2" PARENT_SCOPE)
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches \
+            -Wconversion -Wsign-conversion -Wnull-dereference -Wdouble-promotion -Wformat=2 -Wmisleading-indentation -Wduplicated-cond -Wduplicated-branches \
             -Wlogical-op -Wuseless-cast" PARENT_SCOPE)
     endif ()
 endfunction()
+
+set(CMAKE_VERBOSE_MAKEFILE ON CACHE BOOL "ON" FORCE)
 
 if (${CMAKE_BUILD_TYPE} MATCHES Debug)
     message("Debug Build")
 elseif (${CMAKE_BUILD_TYPE} MATCHES Release)
     message("Release Build")
-    set(CMAKE_VERBOSE_MAKEFILE TRUE)
 endif ()
 option(ENABLE_TESTS "Enable tests" ON)
 if (ENABLE_TESTS)
