@@ -23,6 +23,3 @@ int main()
 
     return EXIT_SUCCESS;
 }
-#ifdef WIN32
-#pragma warning(pop)
-#endif

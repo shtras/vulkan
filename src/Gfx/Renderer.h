@@ -1,17 +1,8 @@
+#pragma once
 
-#ifdef WIN32
-#pragma warning(push)
-#pragma warning(disable : 26812)
-#define GLFW_EXPOSE_NATIVE_WIN32
-#define VK_USE_PLATFORM_WIN32_KHR
-#else
-#define GLFW_EXPOSE_NATIVE_X11
-#define VK_USE_PLATFORM_XLIB_KHR
-#endif
+#include "Vertex.h"
 
-#define GLFW_INCLUDE_VULKAN
-#include <GLFW/glfw3.h>
-#include <GLFW/glfw3native.h>
+#include "vk_wrap.h"
 
 #include <iostream>
 #include <stdexcept>
@@ -73,6 +64,7 @@ private:
     void createSwapChain();
     void createSurface();
     void createLogicalDevice();
+    void createVertexBuffer();
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice d);
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice d);
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
@@ -95,6 +87,7 @@ private:
     bool drawFrame();
     void cleanup();
     void checkValidationLayerSupport();
+    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
     GLFWwindow* window = nullptr;
     static constexpr uint32_t WIDTH = 800;
@@ -133,6 +126,11 @@ private:
     std::vector<VkFence> inFlightImages;
     size_t currentFrame = 0;
     bool framebufferResized = false;
+    VkBuffer vertexBuffer = nullptr;
+    VkDeviceMemory vertexBufferMemory = nullptr;
+
+    const std::vector<Vertex> vertices = {{{0.0f, -0.5f}, {1.0f, 0.0f, 0.0f}},
+        {{0.5f, 0.5f}, {0.0f, 1.0f, 0.0f}}, {{-0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}}};
 };
 
 } // namespace VaryZulu::Gfx

@@ -29,6 +29,8 @@ endfunction()
 
 set(CMAKE_VERBOSE_MAKEFILE ON CACHE BOOL "ON" FORCE)
 
+set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /nologo")
+
 if (${CMAKE_BUILD_TYPE} MATCHES Debug)
     message("Debug Build")
 elseif (${CMAKE_BUILD_TYPE} MATCHES Release)
