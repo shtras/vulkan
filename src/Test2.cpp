@@ -64,9 +64,16 @@ private:
     {
         glfwInit();
         glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-        glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
 
         window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
+        glfwSetWindowUserPointer(window, this);
+        glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
+    }
+
+    static void framebufferResizeCallback(GLFWwindow* window, int, int)
+    {
+        auto app = reinterpret_cast<HelloTriangleApplication*>(glfwGetWindowUserPointer(window));
+        app->framebufferResized = true;
     }
 
     void initVulkan()
@@ -84,6 +91,42 @@ private:
         createCommandPool();
         createCommandBuffers();
         createSyncObjects();
+    }
+
+    void cleanupSwapChain()
+    {
+        std::for_each(swapChainFramebuffers.begin(), swapChainFramebuffers.end(),
+            [this](auto& buf) { vkDestroyFramebuffer(device, buf, nullptr); });
+        swapChainFramebuffers.clear();
+        vkFreeCommandBuffers(device, commandPool, static_cast<uint32_t>(commandBuffers.size()),
+            commandBuffers.data());
+        vkDestroyPipeline(device, graphicsPipeline, nullptr);
+        vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+        vkDestroyRenderPass(device, renderPass, nullptr);
+        std::for_each(swapChainImageViews.begin(), swapChainImageViews.end(),
+            [&](auto& imageView) { vkDestroyImageView(device, imageView, nullptr); });
+        swapChainImageViews.clear();
+        vkDestroySwapchainKHR(device, swapChain, nullptr);
+    }
+
+    void recreateSwapChain()
+    {
+        int width = 0, height = 0;
+        glfwGetFramebufferSize(window, &width, &height);
+        while (width == 0 || height == 0) {
+            glfwGetFramebufferSize(window, &width, &height);
+            glfwWaitEvents();
+        }
+        vkDeviceWaitIdle(device);
+
+        cleanupSwapChain();
+
+        createSwapChain();
+        createImageViews();
+        createRenderPass();
+        createGraphicsPipeline();
+        createFrameBuffers();
+        createCommandBuffers();
     }
 
     void createSyncObjects()
@@ -825,8 +868,14 @@ private:
         auto res = vkAcquireNextImageKHR(device, swapChain, UINT64_MAX,
             imageAvailableSemaphores[currentFrame], VK_NULL_HANDLE, &imageIdx);
         if (res != VK_SUCCESS) {
-            spdlog::error("Failed to acquire the next image");
-            return false;
+            if (res == VK_ERROR_OUT_OF_DATE_KHR) {
+                spdlog::info("Swap chain out of date. Recreating");
+                recreateSwapChain();
+                return true;
+            } else if (res != VK_SUBOPTIMAL_KHR) {
+                spdlog::error("Failed to acquire the next image: {}", res);
+                return false;
+            }
         }
         if (inFlightImages[imageIdx] != VK_NULL_HANDLE) {
             vkWaitForFences(device, 1, &inFlightImages[imageIdx], VK_TRUE, UINT64_MAX);
@@ -861,8 +910,14 @@ private:
 
         res = vkQueuePresentKHR(presentQueue, &presentInfo);
         if (res != VK_SUCCESS) {
-            spdlog::error("Presenting queue failed");
-            return false;
+            if (res == VK_ERROR_OUT_OF_DATE_KHR || res == VK_SUBOPTIMAL_KHR || framebufferResized) {
+                spdlog::info("Out of date or suboptimal swap chain: {}. Recreating.", res);
+                framebufferResized = false;
+                recreateSwapChain();
+            } else {
+                spdlog::error("Presenting queue failed: {}", res);
+                return false;
+            }
         }
         currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
         return true;
@@ -870,6 +925,7 @@ private:
 
     void cleanup()
     {
+        cleanupSwapChain();
         std::for_each(renderFinishedSemaphores.begin(), renderFinishedSemaphores.end(),
             [this](auto& s) { vkDestroySemaphore(device, s, nullptr); });
         std::for_each(imageAvailableSemaphores.begin(), imageAvailableSemaphores.end(),
@@ -877,14 +933,7 @@ private:
         std::for_each(inFlightFences.begin(), inFlightFences.end(),
             [this](auto& s) { vkDestroyFence(device, s, nullptr); });
         vkDestroyCommandPool(device, commandPool, nullptr);
-        std::for_each(swapChainFramebuffers.begin(), swapChainFramebuffers.end(),
-            [this](auto& buf) { vkDestroyFramebuffer(device, buf, nullptr); });
-        vkDestroyPipeline(device, graphicsPipeline, nullptr);
-        vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
-        vkDestroyRenderPass(device, renderPass, nullptr);
-        std::for_each(swapChainImageViews.begin(), swapChainImageViews.end(),
-            [&](auto& imageView) { vkDestroyImageView(device, imageView, nullptr); });
-        vkDestroySwapchainKHR(device, swapChain, nullptr);
+
         vkDestroyDevice(device, nullptr);
 
         vkDestroySurfaceKHR(instance, surface, nullptr);
@@ -953,6 +1002,7 @@ private:
     std::vector<VkFence> inFlightFences;
     std::vector<VkFence> inFlightImages;
     size_t currentFrame = 0;
+    bool framebufferResized = false;
 };
 
 } // namespace VaryZulu::Test2
