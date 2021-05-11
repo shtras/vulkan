@@ -65,6 +65,9 @@ private:
     void createSurface();
     void createLogicalDevice();
     void createVertexBuffer();
+    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
+        VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+    void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice d);
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice d);
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
