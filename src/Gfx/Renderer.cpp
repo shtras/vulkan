@@ -168,8 +168,8 @@ bool Renderer::isDeviceSuitable(VkPhysicalDevice d)
         return false;
     }
 
-    QueueFamilyIndices indices = findQueueFamilies(d);
-    if (!indices.isComplete()) {
+    QueueFamilyIndices queueIndices = findQueueFamilies(d);
+    if (!queueIndices.isComplete()) {
         spdlog::info("Missing required queues");
         return false;
     }
@@ -191,11 +191,11 @@ bool Renderer::isDeviceSuitable(VkPhysicalDevice d)
 
 void Renderer::createLogicalDevice()
 {
-    QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
+    QueueFamilyIndices queueIndices = findQueueFamilies(physicalDevice);
 
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies = {
-        indices.graphicsFamily.value(), indices.presentFamily.value()};
+        queueIndices.graphicsFamily.value(), queueIndices.presentFamily.value()};
 
     spdlog::info("Creating {} {}", uniqueQueueFamilies.size(),
         (uniqueQueueFamilies.size() == 1 ? "queue" : "queues"));
@@ -227,8 +227,8 @@ void Renderer::createLogicalDevice()
         throw std::runtime_error("Failed creating a logical device");
     }
 
-    vkGetDeviceQueue(device, indices.graphicsFamily.value(), 0, &graphicsQueue);
-    vkGetDeviceQueue(device, indices.presentFamily.value(), 0, &presentQueue);
+    vkGetDeviceQueue(device, queueIndices.graphicsFamily.value(), 0, &graphicsQueue);
+    vkGetDeviceQueue(device, queueIndices.presentFamily.value(), 0, &presentQueue);
 }
 
 void Renderer::createSwapChain()
@@ -257,9 +257,10 @@ void Renderer::createSwapChain()
         .clipped = VK_TRUE,
         .oldSwapchain = VK_NULL_HANDLE};
 
-    QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
-    uint32_t queueFamilyIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
-    if (indices.graphicsFamily.value() != indices.presentFamily.value()) {
+    QueueFamilyIndices queueIndices = findQueueFamilies(physicalDevice);
+    uint32_t queueFamilyIndices[] = {
+        queueIndices.graphicsFamily.value(), queueIndices.presentFamily.value()};
+    if (queueIndices.graphicsFamily.value() != queueIndices.presentFamily.value()) {
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.queueFamilyIndexCount = 2;
         createInfo.pQueueFamilyIndices = queueFamilyIndices;
@@ -530,9 +531,10 @@ void Renderer::createCommandBuffers()
 
         VkBuffer vertexBuffers[] = {vertexBuffer};
         VkDeviceSize offsets[] = {0};
-        vkCmdBindVertexBuffers(commandBuffers[i], 0, 1, vertexBuffers, offsets);
+        vkCmdBindVertexBuffers(buf, 0, 1, vertexBuffers, offsets);
+        vkCmdBindIndexBuffer(buf, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
-        vkCmdDraw(buf, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+        vkCmdDrawIndexed(buf, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
         vkCmdEndRenderPass(buf);
         res = vkEndCommandBuffer(buf);
         if (res != VK_SUCCESS) {
@@ -768,6 +770,7 @@ void Renderer::createVertexBuffer()
     createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer,
         stagingBufferMemory);
+
     void* data = nullptr;
     vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
     memcpy(data, vertices.data(), static_cast<size_t>(bufferSize));
@@ -776,6 +779,27 @@ void Renderer::createVertexBuffer()
     createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, vertexBuffer, vertexBufferMemory);
     copyBuffer(stagingBuffer, vertexBuffer, bufferSize);
+    vkDestroyBuffer(device, stagingBuffer, nullptr);
+    vkFreeMemory(device, stagingBufferMemory, nullptr);
+}
+
+void Renderer::createIndexBuffer()
+{
+    VkBuffer stagingBuffer = nullptr;
+    VkDeviceMemory stagingBufferMemory = nullptr;
+    VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, stagingBuffer,
+        stagingBufferMemory);
+
+    void* data = nullptr;
+    vkMapMemory(device, stagingBufferMemory, 0, bufferSize, 0, &data);
+    memcpy(data, indices.data(), static_cast<size_t>(bufferSize));
+    vkUnmapMemory(device, stagingBufferMemory);
+
+    createBuffer(bufferSize, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, indexBuffer, indexBufferMemory);
+    copyBuffer(stagingBuffer, indexBuffer, bufferSize);
     vkDestroyBuffer(device, stagingBuffer, nullptr);
     vkFreeMemory(device, stagingBufferMemory, nullptr);
 }
@@ -806,7 +830,7 @@ SwapChainSupportDetails Renderer::querySwapChainSupport(VkPhysicalDevice d)
 
 QueueFamilyIndices Renderer::findQueueFamilies(VkPhysicalDevice d)
 {
-    QueueFamilyIndices indices;
+    QueueFamilyIndices res;
 
     uint32_t queueFamilyCount = 0;
     vkGetPhysicalDeviceQueueFamilyProperties(d, &queueFamilyCount, nullptr);
@@ -816,18 +840,18 @@ QueueFamilyIndices Renderer::findQueueFamilies(VkPhysicalDevice d)
 
     uint32_t i = 0;
     for (const auto& queueFamily : queueFamilies) {
-        if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT && !indices.graphicsFamily.has_value()) {
-            indices.graphicsFamily = i;
+        if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT && !res.graphicsFamily.has_value()) {
+            res.graphicsFamily = i;
         }
         VkBool32 presentSupport = false;
         vkGetPhysicalDeviceSurfaceSupportKHR(d, i, surface, &presentSupport);
-        if (presentSupport && !indices.presentFamily.has_value()) {
-            indices.presentFamily = i;
+        if (presentSupport && !res.presentFamily.has_value()) {
+            res.presentFamily = i;
         }
         i++;
     }
 
-    return indices;
+    return res;
 }
 
 VkExtent2D Renderer::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities)
@@ -994,6 +1018,7 @@ void Renderer::initVulkan()
     createFrameBuffers();
     createCommandPool();
     createVertexBuffer();
+    createIndexBuffer();
     createCommandBuffers();
     createSyncObjects();
 }
@@ -1001,6 +1026,8 @@ void Renderer::initVulkan()
 void Renderer::cleanup()
 {
     cleanupSwapChain();
+    vkDestroyBuffer(device, indexBuffer, nullptr);
+    vkFreeMemory(device, indexBufferMemory, nullptr);
     vkDestroyBuffer(device, vertexBuffer, nullptr);
     vkFreeMemory(device, vertexBufferMemory, nullptr);
     std::for_each(renderFinishedSemaphores.begin(), renderFinishedSemaphores.end(),
