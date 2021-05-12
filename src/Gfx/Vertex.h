@@ -2,12 +2,18 @@
 
 #include "vk_wrap.h"
 
-#include <glm/glm.hpp>
-
 #include <array>
 
 namespace VaryZulu::Gfx
 {
+struct UniformBufferObject
+{
+    alignas(16) glm::mat4 model;
+
+    alignas(16) glm::mat4 view;
+    alignas(16) glm::mat4 proj;
+};
+
 struct Vertex
 {
     glm::vec2 pos;

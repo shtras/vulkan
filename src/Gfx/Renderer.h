@@ -59,6 +59,7 @@ private:
     void createFrameBuffers();
     void createRenderPass();
     VkShaderModule createShaderModule(const std::vector<char>& code);
+    void createDescriptorSetLayout();
     void createGraphicsPipeline();
     void createImageViews();
     void createSwapChain();
@@ -66,6 +67,9 @@ private:
     void createLogicalDevice();
     void createVertexBuffer();
     void createIndexBuffer();
+    void createUniformBuffers();
+    void createDescriptorPool();
+    void createDescriptorSets();
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
         VkBuffer& buffer, VkDeviceMemory& bufferMemory);
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
@@ -86,6 +90,7 @@ private:
     static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
         VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity, VkDebugUtilsMessageTypeFlagsEXT,
         const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData, void*);
+    void updateUniformBuffer(uint32_t currImage);
     void createInstance();
     void mainLoop();
     bool drawFrame();
@@ -121,6 +126,7 @@ private:
     VkFormat swapChainImageFormat = VK_FORMAT_UNDEFINED;
     VkExtent2D swapChainExtent{};
     VkRenderPass renderPass = nullptr;
+    VkDescriptorSetLayout descriptorSetLayout = nullptr;
     VkPipelineLayout pipelineLayout = nullptr;
     VkPipeline graphicsPipeline = nullptr;
     VkCommandPool commandPool = nullptr;
@@ -134,6 +140,10 @@ private:
     VkDeviceMemory vertexBufferMemory = nullptr;
     VkBuffer indexBuffer = nullptr;
     VkDeviceMemory indexBufferMemory = nullptr;
+    std::vector<VkBuffer> uniformBuffers;
+    std::vector<VkDeviceMemory> uniformBuffersMemory;
+    VkDescriptorPool descriptorPool = nullptr;
+    std::vector<VkDescriptorSet> descriptorSets;
 
     const std::vector<Vertex> vertices = {{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
         {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}}, {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
