@@ -87,6 +87,8 @@ function(compile_shader target)
     endforeach()
 endfunction()
 
+configure_file("${CMAKE_SOURCE_DIR}/textures/texture.jpg" "${CMAKE_SOURCE_DIR}/run/textures/texture.jpg" COPYONLY)
+
 if (BUILD_TOOLS)
     message("Building additonal tools")
     add_subdirectory(tools)

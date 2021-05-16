@@ -56,6 +56,9 @@ private:
     void createSyncObjects();
     void createCommandBuffers();
     void createCommandPool();
+    void createTextureImage();
+    void createTextureImageView();
+    void createTextureSampler();
     void createFrameBuffers();
     void createRenderPass();
     VkShaderModule createShaderModule(const std::vector<char>& code);
@@ -70,9 +73,18 @@ private:
     void createUniformBuffers();
     void createDescriptorPool();
     void createDescriptorSets();
+    VkImageView createImageView(VkImage image, VkFormat format);
+    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
         VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+    void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
+        VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImage& image,
+        VkDeviceMemory& imageMemory);
+    VkCommandBuffer beginSingleTimeCommands();
+    void endSingleTimeCommands(VkCommandBuffer buffer);
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
+    void transitionImageLayout(
+        VkImage image, VkFormat, VkImageLayout oldLayout, VkImageLayout newLayout);
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice d);
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice d);
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);
@@ -144,10 +156,16 @@ private:
     std::vector<VkDeviceMemory> uniformBuffersMemory;
     VkDescriptorPool descriptorPool = nullptr;
     std::vector<VkDescriptorSet> descriptorSets;
+    VkImage textureImage = nullptr;
+    VkDeviceMemory textureImageMemory = nullptr;
+    VkImageView textureImageView = nullptr;
+    VkSampler textureSampler = nullptr;
 
-    const std::vector<Vertex> vertices = {{{-0.5f, -0.5f}, {1.0f, 0.0f, 0.0f}},
-        {{0.5f, -0.5f}, {0.0f, 1.0f, 0.0f}}, {{0.5f, 0.5f}, {0.0f, 0.0f, 1.0f}},
-        {{-0.5f, 0.5f}, {1.0f, 1.0f, 1.0f}}};
+    const std::vector<Vertex> vertices = {
+        Vertex{.pos{-0.5f, -0.5f}, .color{1.0f, 0.0f, 0.0f}, .texCoord{1.0f, 0.0f}},
+        Vertex{.pos{0.5f, -0.5f}, .color{0.0f, 1.0f, 0.0f}, .texCoord{0.0f, 0.0f}},
+        Vertex{.pos{0.5f, 0.5f}, .color{0.0f, 0.0f, 1.0f}, .texCoord{0.0f, 1.0f}},
+        Vertex{.pos{-0.5f, 0.5f}, .color{1.0f, 1.0f, 1.0f}, .texCoord{1.0f, 1.0f}}};
     const std::vector<uint16_t> indices = {0, 1, 2, 2, 3, 0};
 };
 
