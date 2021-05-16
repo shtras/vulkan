@@ -74,7 +74,8 @@ private:
     void createDescriptorPool();
     void createDescriptorSets();
     VkImageView createImageView(VkImage image, VkFormat format);
-    void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+    void copyBufferToImage(VkCommandBuffer commandBuffer, VkBuffer buffer, VkImage image,
+        uint32_t width, uint32_t height);
     void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties,
         VkBuffer& buffer, VkDeviceMemory& bufferMemory);
     void createImage(uint32_t width, uint32_t height, VkFormat format, VkImageTiling tiling,
@@ -83,8 +84,8 @@ private:
     VkCommandBuffer beginSingleTimeCommands();
     void endSingleTimeCommands(VkCommandBuffer buffer);
     void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
-    void transitionImageLayout(
-        VkImage image, VkFormat, VkImageLayout oldLayout, VkImageLayout newLayout);
+    void transitionImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkFormat,
+        VkImageLayout oldLayout, VkImageLayout newLayout);
     SwapChainSupportDetails querySwapChainSupport(VkPhysicalDevice d);
     QueueFamilyIndices findQueueFamilies(VkPhysicalDevice d);
     VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capabilities);

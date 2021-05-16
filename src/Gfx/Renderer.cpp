@@ -575,12 +575,14 @@ void Renderer::createTextureImage()
     createImage(texWidth, texHeight, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, textureImage, textureImageMemory);
-    transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    copyBufferToImage(stagingBuffer, textureImage, static_cast<uint32_t>(texWidth),
+    auto commandBuffer = beginSingleTimeCommands();
+    transitionImageLayout(commandBuffer, textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+        VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    copyBufferToImage(commandBuffer, stagingBuffer, textureImage, static_cast<uint32_t>(texWidth),
         static_cast<uint32_t>(texHeight));
-    transitionImageLayout(textureImage, VK_FORMAT_R8G8B8A8_SRGB,
+    transitionImageLayout(commandBuffer, textureImage, VK_FORMAT_R8G8B8A8_SRGB,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    endSingleTimeCommands(commandBuffer);
 
     vkDestroyBuffer(device, stagingBuffer, nullptr);
     vkFreeMemory(device, stagingBufferMemory, nullptr);
@@ -843,6 +845,7 @@ void Renderer::cleanupSwapChain()
         [&](auto& imageView) { vkDestroyImageView(device, imageView, nullptr); });
     swapChainImageViews.clear();
     vkDestroySwapchainKHR(device, swapChain, nullptr);
+    vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
 }
 
 void Renderer::recreateSwapChain()
@@ -882,10 +885,9 @@ uint32_t Renderer::findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags pro
     throw std::runtime_error("Failed to find memory of the required type");
 }
 
-void Renderer::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
+void Renderer::copyBufferToImage(
+    VkCommandBuffer commandBuffer, VkBuffer buffer, VkImage image, uint32_t width, uint32_t height)
 {
-    auto commandBuffer = beginSingleTimeCommands();
-
     VkBufferImageCopy region{.bufferOffset = 0,
         .bufferRowLength = 0,
         .bufferImageHeight = 0,
@@ -898,8 +900,6 @@ void Renderer::copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width,
 
     vkCmdCopyBufferToImage(
         commandBuffer, buffer, image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-
-    endSingleTimeCommands(commandBuffer);
 }
 
 void Renderer::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
@@ -970,11 +970,9 @@ void Renderer::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize s
     endSingleTimeCommands(commandBuffer);
 }
 
-void Renderer::transitionImageLayout(
-    VkImage image, VkFormat, VkImageLayout oldLayout, VkImageLayout newLayout)
+void Renderer::transitionImageLayout(VkCommandBuffer commandBuffer, VkImage image, VkFormat,
+    VkImageLayout oldLayout, VkImageLayout newLayout)
 {
-    auto buffer = beginSingleTimeCommands();
-
     VkImageMemoryBarrier barrier{.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
         .srcAccessMask = 0,
         .dstAccessMask = 0,
@@ -1007,9 +1005,8 @@ void Renderer::transitionImageLayout(
     } else {
         throw std::runtime_error("Unsupported layout transition");
     }
-    vkCmdPipelineBarrier(buffer, sourceStage, destStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
-
-    endSingleTimeCommands(buffer);
+    vkCmdPipelineBarrier(
+        commandBuffer, sourceStage, destStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
 void Renderer::createVertexBuffer()
@@ -1361,7 +1358,6 @@ void Renderer::cleanup()
     vkDestroyImageView(device, textureImageView, nullptr);
     vkDestroyImage(device, textureImage, nullptr);
     vkFreeMemory(device, textureImageMemory, nullptr);
-    vkDestroyDescriptorSetLayout(device, descriptorSetLayout, nullptr);
     vkDestroyBuffer(device, indexBuffer, nullptr);
     vkFreeMemory(device, indexBufferMemory, nullptr);
     vkDestroyBuffer(device, vertexBuffer, nullptr);
